@@ -81,7 +81,11 @@ class ExternalFormatterUriValue extends UriValue {
 
 		// Avoid already encoded values like `W%D6LLEKLA01` to be
 		// encoded twice
-		$value = $this->encode( rawurldecode( $value ) );
+		$valuePathsDecoded = array_map( 'rawurldecode', explode( '/', $value ) );
+		$valuePathsEncoded = array_map( function( $path ) {
+			return $this->encode( $path, true );
+		}, $valuePathsDecoded );
+		$value = implode( '/', $valuePathsEncoded );
 		$uri = str_replace( [ '%241', '$1' ], [ '$1', $value ], $uri );
 
 		// Fill the other parameters
@@ -89,7 +93,7 @@ class ExternalFormatterUriValue extends UriValue {
 			$pos = $key + 2;
 			$uri = str_replace(
 				[ "%24" . $pos, "$" . $pos ],
-				[ "$" . $pos, $this->encode( rawurldecode( $val ) ) ],
+				[ "$" . $pos, $this->encode( rawurldecode( $val ), false ) ],
 				$uri
 			);
 		}
@@ -99,10 +103,17 @@ class ExternalFormatterUriValue extends UriValue {
 	}
 
 	// http://php.net/manual/en/function.urlencode.php#97969
-	private function encode( $string ) {
+	// #5212
+	private function encode( $string, bool $excludeForwardSlash = false ) {
+		$replaceables = [ '%21', '%2A', '%27', '%28', '%29', '%3B', '%3A', '%40', '%26', '%3D', '%2B', '%24', '%2C', '%3F', '%25', '%23', '%5B', '%5D' ];
+		$replacements = [ '!', '*', "'", "(", ")", ";", ":", "@", "&", "=", "+", "$", ",", "?", "%", "#", "[", "]" ];
+		if ( !$excludeForwardSlash ) {
+			$replaceables[] = '%2F';
+			$replacements[] = "/";
+		}
 		return str_replace(
-			[ '%21', '%2A', '%27', '%28', '%29', '%3B', '%3A', '%40', '%26', '%3D', '%2B', '%24', '%2C', '%2F', '%3F', '%25', '%23', '%5B', '%5D' ],
-			[ '!', '*', "'", "(", ")", ";", ":", "@", "&", "=", "+", "$", ",", "/", "?", "%", "#", "[", "]" ],
+			$replaceables,
+			$replacements,
 			urlencode( $string )
 		);
 	}
